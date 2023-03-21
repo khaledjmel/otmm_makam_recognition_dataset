@@ -1,0 +1,51 @@
+fileType = 'wave'
+numFiles = 15
+collectionName = 'tba'
+modeType = 'tba'
+# modes for which we will estimate a scale
+tba = ['dhil', 'rasd']
+dataDir = os.path.join('..', 'data', 'compMusicDatasets', 'tunisian tubu')
+
+# Load dataset files in mode Huseyni
+with open(os.path.join(dataDir, 'annotations.json')) as json_data:
+    collectionFiles = json.load(json_data)
+
+#Create directories for modes and download one recording for each
+modeFilesInfo = {}
+print('Downloading mp3 files in {}'.format(dataDir))
+for mode in modes:
+    os.makedirs(os.path.join(dataDir, mode), exist_ok=True)
+
+    mbidList = []
+    tonics = {}
+    fileCnt = 0
+    for file in collectionFiles:
+        if file[modeType] == mode:
+            mbid = file['mbid'].split('http://musicbrainz.org/recording/')[-1]
+            
+            # If tonic info is available from Dunya, add to set of recordings
+            if not tonic:
+                print('Tonic could not be read for {}, skipping this file'.format(mbid))
+            try:
+                content = ds.get_document_as_json(mbid, 'audioanalysis', 'tonic')
+                tonic = content['value']
+            except dunya.HTTPError:
+                tonic = None
+            else:
+                tonics[mbid] = float(tonic)
+                mbidList.append(mbid)
+          
+                #Download mp3
+                name = '{}.{}'.format(mbid, fileType)
+                mp3FileURI = os.path.join(dataDir, mode, name)
+                # Download file if it has not been previously downloaded
+                if not os.path.exists(mp3FileURI):
+                    contents = ds.file_for_document(mbid, fileType)
+                    open(mp3FileURI, "wb").write(contents)
+                fileCnt += 1
+                if fileCnt >= numFiles:
+                    print('{} files downloaded'.format(numFiles))
+                    break
+    modeFilesInfo[mode] = (mbidList, tonics)
+    
+print('Download finished!')
